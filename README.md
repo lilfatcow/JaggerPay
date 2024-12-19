@@ -172,6 +172,289 @@ jaggerpay-frontend/
    - Use lazy loading for routes
    - Optimize bundle size
 
+## API Documentation
+
+### Authentication
+
+JaggerPay uses NextAuth.js for authentication with JWT strategy. The authentication flow supports both server-side and client-side implementations.
+
+#### Server-Side (Next.js)
+
+Authentication is handled through NextAuth.js with the following endpoints:
+
+```typescript
+POST /api/auth/signin
+POST /api/auth/signout
+GET  /api/auth/session
+POST /api/auth/callback/credentials
+```
+
+##### Credentials Provider Setup
+
+```typescript
+// Environment Variables Required
+NEXTAUTH_SECRET="your-jwt-secret"
+NEXTAUTH_URL="http://localhost:3000"
+
+// Example Authentication Request
+POST /api/auth/callback/credentials
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "your-password"
+}
+```
+
+##### Protected API Routes
+
+```typescript
+// Example of a protected API route
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  
+  // Your protected route logic here
+}
+```
+
+#### Client-Side (React + Vite)
+
+For the React + Vite frontend, implement authentication using the following approach:
+
+1. **Setup Authentication Context**
+
+```typescript
+// src/contexts/AuthContext.tsx
+import { createContext, useContext, useState } from 'react';
+
+interface AuthContextType {
+  token: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+}
+
+export const AuthContext = createContext<AuthContextType>(null!);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [token, setToken] = useState<string | null>(null);
+
+  const login = async (email: string, password: string) => {
+    const response = await fetch('/api/auth/signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Authentication failed');
+    }
+    
+    const data = await response.json();
+    setToken(data.token);
+  };
+
+  const logout = () => {
+    setToken(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ token, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+```
+
+2. **Protected Route Component**
+
+```typescript
+// src/components/ProtectedRoute.tsx
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
+  
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+}
+```
+
+### API Endpoints
+
+JaggerPay uses tRPC for type-safe API communication. Here are the available endpoints:
+
+#### Invoices
+
+1. **Get All Invoices**
+```typescript
+// Query
+const invoices = await trpc.invoice.getAll.query({
+  limit?: number;  // Optional, max 100
+  offset?: number; // Optional
+});
+
+// Response Type
+interface Invoice {
+  id: string;
+  moniteId: string;
+  amount: number;
+  status: string;
+  dueDate: Date;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+2. **Create Invoice**
+```typescript
+// Mutation
+const invoice = await trpc.invoice.create.mutate({
+  amount: number;
+  dueDate: string; // ISO date string
+  // Additional fields as needed
+});
+
+// Response includes both local and Monite invoice data
+```
+
+### Monite API Integration
+
+JaggerPay integrates with the Monite API for payment processing. Here's how to set it up:
+
+1. **Environment Configuration**
+```env
+NEXT_PUBLIC_MONITE_API_URL=https://api.sandbox.monite.com/v1
+NEXT_PUBLIC_MONITE_VERSION=2024-01-31
+MONITE_API_KEY=your_api_key
+```
+
+2. **Service Setup**
+```typescript
+// src/services/monite.ts
+export class MoniteService {
+  private readonly apiUrl: string;
+  private readonly version: string;
+  
+  constructor() {
+    this.apiUrl = process.env.NEXT_PUBLIC_MONITE_API_URL!;
+    this.version = process.env.NEXT_PUBLIC_MONITE_VERSION!;
+  }
+
+  async createInvoice(data: CreateInvoiceDto) {
+    // Implementation
+  }
+  
+  // Other methods
+}
+```
+
+### Error Handling
+
+The API uses standard HTTP status codes and returns errors in the following format:
+
+```typescript
+interface ApiError {
+  code: string;
+  message: string;
+  details?: Record<string, any>;
+}
+
+// Example error response
+{
+  "code": "UNAUTHORIZED",
+  "message": "Invalid credentials",
+  "details": {
+    "field": "password",
+    "error": "incorrect_password"
+  }
+}
+```
+
+Common error codes:
+- `400`: Bad Request
+- `401`: Unauthorized
+- `403`: Forbidden
+- `404`: Not Found
+- `422`: Validation Error
+- `500`: Internal Server Error
+
+### Rate Limiting
+
+API requests are rate-limited to:
+- 100 requests per minute for authenticated users
+- 20 requests per minute for unauthenticated users
+
+### Security Considerations
+
+1. **CORS Configuration**
+```typescript
+// Next.js API route CORS configuration
+export const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+```
+
+2. **JWT Configuration**
+```typescript
+// src/app/api/auth/[...nextauth]/route.ts
+export const authOptions: NextAuthOptions = {
+  // ... other options
+  jwt: {
+    maxAge: 60 * 60 * 24, // 24 hours
+    secret: process.env.NEXTAUTH_SECRET,
+  },
+  // ... additional configuration
+};
+```
+
+### WebSocket Support
+
+For real-time features, JaggerPay uses WebSocket connections:
+
+```typescript
+// Client-side WebSocket setup
+const ws = new WebSocket('ws://your-api-url/ws');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  // Handle real-time updates
+};
+```
+
+### Testing the API
+
+1. **Using curl**
+```bash
+# Authentication
+curl -X POST http://localhost:3000/api/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password"}'
+
+# Create Invoice (with authentication)
+curl -X POST http://localhost:3000/api/trpc/invoice.create \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":100,"dueDate":"2024-12-31"}'
+```
+
+2. **Using Postman**
+Import the Postman collection from `/docs/postman/jaggerpay-api.json`
+
 ## Contributing
 
 1. Fork the repository
