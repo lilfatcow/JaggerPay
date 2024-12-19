@@ -194,6 +194,64 @@ if (!session) {
 }
 ```
 
+## Development with Tempo
+
+JaggerPay integrates with [Tempo](https://www.tempolabs.ai/) for visual development and real-time code editing. This integration provides:
+- Visual editing capabilities
+- Real-time error handling
+- Code synchronization
+- Interactive development workflow
+
+### Running with Tempo
+
+1. **Start Development Server with Tempo**
+   ```bash
+   NEXT_PUBLIC_TEMPO=1 npm run dev
+   ```
+
+2. **Using the Visual Editor**
+   - Use the file selector in the left navbar to choose files to edit
+   - Make visual changes that automatically sync with your code
+   - View real-time error feedback
+
+### Tempo Configuration
+
+The project includes several Tempo-specific configurations:
+
+1. **Error Handling**
+   ```typescript
+   // src/app/layout.tsx
+   <Script src="https://api.tempolabs.ai/proxy-asset?url=https://storage.googleapis.com/tempo-public-assets/error-handling.js" />
+   ```
+
+2. **SWC Plugin**
+   ```javascript
+   // next.config.js
+   if (process.env.NEXT_PUBLIC_TEMPO) {
+     nextConfig.experimental = {
+       swcPlugins: [[require.resolve("tempo-devtools/swc/0.90"), {}]]
+     };
+   }
+   ```
+
+3. **Initialization**
+   ```typescript
+   // src/components/providers.tsx
+   useEffect(() => {
+     if (process.env.NEXT_PUBLIC_TEMPO) {
+       TempoDevtools.init();
+     }
+   }, []);
+   ```
+
+### Excluded Files
+
+The following Tempo-specific files are excluded from version control:
+```
+**/tempobook/dynamic/
+**/tempobook/storyboards/
+```
+
 ## Deployment
 
 1. **Database Migration**
