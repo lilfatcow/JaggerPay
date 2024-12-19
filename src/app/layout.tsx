@@ -3,7 +3,6 @@ import './globals.css'
 import { ConfigProvider } from 'antd'
 import { Providers } from '@/components/providers'
 import Script from 'next/script'
-import Head from 'next/head'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,9 +18,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <Head>
-        <Script src="https://api.tempolabs.ai/proxy-asset?url=https://storage.googleapis.com/tempo-public-assets/error-handling.js" />
-      </Head>
+      <head>
+        <Script
+          src="https://api.tempolabs.ai/proxy-asset?url=https://storage.googleapis.com/tempo-public-assets/error-handling.js"
+          strategy="beforeInteractive"
+        />
+      </head>
       <body className={inter.className}>
         <Providers>
           <ConfigProvider>

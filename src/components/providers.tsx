@@ -19,7 +19,7 @@ const trpcClient = trpc.createClient({
 
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_TEMPO) {
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_TEMPO) {
       TempoDevtools.init();
     }
   }, []);
