@@ -37,9 +37,9 @@ jaggerpay/
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18 or later
+- Node.js >= 18.0.0 (required for Next.js 14)
+- npm >= 8.0.0 (package-lock.json version 3)
 - PostgreSQL 12 or later
-- npm or yarn
 - Git
 
 ### Installation
