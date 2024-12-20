@@ -1,36 +1,24 @@
-'use client';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Providers } from "@/providers/providers";
 
-import { Inter, Playfair_Display } from 'next/font/google';
-import './globals.css';
-import { AuthProvider } from '@/providers/auth-provider';
-import { MoniteAppProvider } from '@/providers/monite-provider';
-import { Toaster } from '@/components/ui/sonner';
-import { usePathname } from 'next/navigation';
-import { ThemeProvider } from 'next-themes';
-import { Providers } from './providers';
+const inter = Inter({ subsets: ["latin"] });
 
-const inter = Inter({ subsets: ['latin'] });
-const playfair = Playfair_Display({ subsets: ['latin'] });
+export const metadata: Metadata = {
+  title: "WonderPay",
+  description: "Modern business payments platform",
+};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const isAuthPage = pathname === '/auth' || pathname === '/auth/signup';
-
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <AuthProvider>
-            <Providers>
-              {children}
-            </Providers>
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

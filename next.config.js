@@ -7,6 +7,9 @@ const nextConfig = {
     unoptimized: true,
     remotePatterns: [],
   },
+  server: {
+    port: 3001,
+  },
 };
 
 module.exports = nextConfig;

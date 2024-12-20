@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(request: Request) {
   try {
@@ -11,29 +10,35 @@ export async function POST(request: Request) {
       return new NextResponse("Missing fields", { status: 400 });
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: {
-        email,
+    const { data: { user }, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+        },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/auth`,
       },
     });
 
-    if (existingUser) {
-      return new NextResponse("Email already exists", { status: 400 });
+    if (error) {
+      return new NextResponse(error.message, { status: 400 });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Check if the user needs to verify their email
+    if (user?.identities?.length === 0) {
+      return new NextResponse(
+        "Account exists. Please check your email for verification.",
+        { status: 400 }
+      );
+    }
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        name,
-        password: hashedPassword,
-      },
+    return NextResponse.json({
+      user,
+      message: "Check your email for the confirmation link.",
     });
-
-    return NextResponse.json(user);
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }

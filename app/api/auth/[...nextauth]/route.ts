@@ -1,19 +1,11 @@
 import NextAuth from "next-auth";
 import { AuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
 import AppleProvider from "next-auth/providers/apple";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { supabase } from "@/lib/supabase";
 
 export const authOptions: AuthOptions = {
-  adapter: PrismaAdapter(prisma),
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
     AppleProvider({
       clientId: process.env.APPLE_CLIENT_ID!,
       clientSecret: process.env.APPLE_CLIENT_SECRET!,
@@ -25,37 +17,67 @@ export const authOptions: AuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Invalid credentials");
-        }
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error("Invalid credentials");
+          }
 
-        const user = await prisma.user.findUnique({
-          where: {
+          console.log('NextAuth: Attempting to authorize with credentials:', credentials.email);
+
+          const { data: { user }, error } = await supabase.auth.signInWithPassword({
             email: credentials.email,
-          },
-        });
+            password: credentials.password,
+          });
 
-        if (!user || !user?.password) {
-          throw new Error("Invalid credentials");
+          console.log('NextAuth: Supabase response:', { user, error });
+
+          if (error) {
+            console.error('NextAuth: Supabase error:', error);
+            throw new Error(error.message);
+          }
+
+          if (!user) {
+            console.error('NextAuth: No user found');
+            throw new Error("User not found");
+          }
+
+          console.log('NextAuth: Authorization successful');
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name || user.email?.split('@')[0],
+          };
+        } catch (error) {
+          console.error('NextAuth: Authorization error:', error);
+          throw error;
         }
-
-        const isCorrectPassword = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!isCorrectPassword) {
-          throw new Error("Invalid credentials");
-        }
-
-        return user;
       },
     }),
   ],
   pages: {
     signIn: "/auth",
   },
-  debug: process.env.NODE_ENV === "development",
+  callbacks: {
+    async jwt({ token, user }) {
+      console.log('NextAuth: JWT callback:', { token, user });
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      console.log('NextAuth: Session callback:', { session, token });
+      if (token) {
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+      }
+      return session;
+    },
+  },
+  debug: true,
   session: {
     strategy: "jwt",
   },

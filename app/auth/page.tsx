@@ -1,48 +1,64 @@
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Logo } from '@/components/layout/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Apple, LockKeyhole } from 'lucide-react';
+import { Apple, LockKeyhole, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function AuthPage() {
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { signIn, user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
 
   const handleEmailSignIn = async () => {
     try {
       setIsLoading(true);
-      const result = await signIn('email', {
-        email,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error('Failed to sign in. Please try again.');
-      } else {
-        toast.success('Check your email for the sign in link!');
-      }
-    } catch (error) {
-      toast.error('An error occurred. Please try again.');
+      await signIn(email, password);
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      toast.error(error.message || 'Failed to sign in');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSocialSignIn = async (provider: string) => {
+  const handleSignUp = async () => {
     try {
       setIsLoading(true);
-      await signIn(provider, {
-        callbackUrl: '/dashboard',
+      const { data: { user }, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
+        },
       });
-    } catch (error) {
-      toast.error('An error occurred. Please try again.');
+
+      if (error) throw error;
+
+      toast.success('Please check your email for verification link.');
+      setIsSignUp(false);
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      toast.error(error.message || 'Failed to create account');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -53,36 +69,26 @@ export default function AuthPage() {
         <div className="flex flex-col items-center text-center">
           <Logo />
           <h2 className="mt-6 text-3xl font-bold tracking-tight">
-            Welcome back
+            {isSignUp ? 'Create an account' : 'Welcome back'}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to your account to continue
+            {isSignUp ? 'Sign up to get started' : 'Sign in to your account to continue'}
           </p>
         </div>
 
         <div className="space-y-4">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialSignIn('apple')}
-            disabled={isLoading}
-          >
-            <Apple className="mr-2 h-4 w-4" />
-            Continue with Apple
-          </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
           <div className="space-y-4">
+            {isSignUp && (
+              <div>
+                <Input
+                  type="text"
+                  placeholder="Enter your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
             <div>
               <Input
                 type="email"
@@ -92,29 +98,45 @@ export default function AuthPage() {
                 disabled={isLoading}
               />
             </div>
+            <div>
+              <Input
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
 
             <Button
               className="w-full"
-              onClick={handleEmailSignIn}
-              disabled={isLoading || !email}
+              onClick={isSignUp ? handleSignUp : handleEmailSignIn}
+              disabled={isLoading || !email || !password || (isSignUp && !name)}
             >
-              <LockKeyhole className="mr-2 h-4 w-4" />
-              {isLoading ? 'Signing in...' : 'Continue with Email'}
+              {isSignUp ? (
+                <>
+                  <User className="mr-2 h-4 w-4" />
+                  Sign Up
+                </>
+              ) : (
+                <>
+                  <LockKeyhole className="mr-2 h-4 w-4" />
+                  Sign In
+                </>
+              )}
             </Button>
-          </div>
-        </div>
 
-        <div className="text-center text-sm">
-          <span className="text-muted-foreground">
-            Don't have an account?{' '}
-          </span>
-          <Button
-            variant="link"
-            className="font-semibold"
-            onClick={() => router.push('/auth/signup')}
-          >
-            Sign up
-          </Button>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-sm text-muted-foreground hover:text-primary"
+                disabled={isLoading}
+              >
+                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
