@@ -61,17 +61,17 @@ class MoniteService {
       console.log('Getting access token...');
       const tokenData = {
         grant_type: 'client_credentials',
-        client_id: process.env.NEXT_PUBLIC_MONITE_CLIENT_ID,
-        client_secret: process.env.NEXT_PUBLIC_MONITE_CLIENT_SECRET,
-        audience: process.env.NEXT_PUBLIC_MONITE_AUDIENCE,
+        client_id: MONITE_CONFIG.clientId,
+        client_secret: MONITE_CONFIG.clientSecret,
       };
 
       console.log('Token request data:', JSON.stringify(tokenData, null, 2));
 
-      const response = await fetch('https://api.sandbox.monite.com/v1/auth/token', {
+      const response = await fetch(`${MONITE_CONFIG.apiUrl}/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-monite-version': MONITE_CONFIG.version,
         },
         body: JSON.stringify(tokenData),
       });
@@ -114,10 +114,11 @@ class MoniteService {
   private async getEntity(token: string): Promise<string | null> {
     try {
       console.log('Getting entity...');
-      const response = await fetch('https://api.sandbox.monite.com/v1/entities', {
+      const response = await fetch(`${MONITE_CONFIG.apiUrl}/entities`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'x-monite-version': MONITE_CONFIG.version,
         },
       });
 
@@ -167,11 +168,12 @@ class MoniteService {
 
       console.log('Creating entity with data:', JSON.stringify(entityData, null, 2));
 
-      const response = await fetch('https://api.sandbox.monite.com/v1/entities', {
+      const response = await fetch(`${MONITE_CONFIG.apiUrl}/entities`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'x-monite-version': MONITE_CONFIG.version,
         },
         body: JSON.stringify(entityData),
       });
@@ -193,21 +195,23 @@ class MoniteService {
 
   getSDK(): MoniteSDK | null {
     if (!this.accessToken || !this.entityId) {
-      console.error('Cannot create SDK: missing token or entity ID');
+      console.log('Cannot create SDK: missing token or entity ID');
       return null;
     }
 
     console.log('Creating Monite SDK with entity ID:', this.entityId);
     return new MoniteSDK({
-      apiUrl: 'https://api.sandbox.monite.com/v1',
-      entityId: this.entityId,
       fetchToken: async () => {
         console.log('Refreshing token...');
         const token = await this.getAccessToken();
-        if (!token) throw new Error('Failed to refresh token');
-        this.accessToken = token;
+        if (!token) {
+          throw new Error('Failed to refresh token');
+        }
         return token;
       },
+      entityId: this.entityId,
+      apiUrl: MONITE_CONFIG.apiUrl,
+      version: MONITE_CONFIG.version,
     });
   }
 }
